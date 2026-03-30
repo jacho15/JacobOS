@@ -1,13 +1,10 @@
-CURRENT:
+COMPLETED:
 1. boot -> kernel code execution (print something to screen)
-- progress: bootloader runs, prints string, and stops
-- todo: switch to 32-bit protected mode, load kernel from disk, and jump to kernel code to print to memory
 
-
-
-
-
+CURRENT:
 2. interrupts trigger correctly, keyboard input works
+
+TODO:
 3. memory allocation/deallocation, paging enabled
 4. process creation/switching, scheduler works
 5. file reads/writes, persistence
