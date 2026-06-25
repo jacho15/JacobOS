@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JacobOS — a hobby x86 operating system, live in your browser</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* palette lifted from jacob-a-cho.com "Real World" theme — cool monochrome */
+  :root {
+    --bg:        rgb(248 248 250);
+    --surface:   rgb(255 255 255);
+    --line:      rgb(225 225 230);
+    --line-soft: rgb(238 238 242);
+    --ink:       rgb(10 10 12);
+    --ink-soft:  rgb(85 85 92);
+    --muted:     rgb(140 140 148);
+    --term-bg:   rgb(12 12 14);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── header ── */
+  header { padding: 72px 0 40px; border-bottom: 1px solid var(--line); }
+  .kicker {
+    font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; margin-bottom: 18px;
+  }
+  h1 {
+    font-family: 'Anton', sans-serif; font-weight: 400;
+    font-size: clamp(56px, 12vw, 124px); line-height: 0.92;
+    letter-spacing: 0.01em; text-transform: uppercase; margin: 0;
+  }
+  .lede {
+    margin: 22px 0 0; max-width: 60ch;
+    font-size: 17px; color: var(--ink-soft);
+  }
+  .lede a { color: var(--ink); text-underline-offset: 3px; }
+
+  /* ── terminal ── */
+  .term-section { padding: 40px 0 8px; }
+  .term-label {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600; margin-bottom: 12px;
+  }
+  .term-frame {
+    background: var(--term-bg); border: 1px solid var(--ink);
+    border-radius: 4px; padding: 14px; overflow: hidden;
+  }
+  #screen { white-space: pre; font: 14px/1.0 'JetBrains Mono', 'Courier New', monospace; color: #dcdcdc; }
+  #screen div { white-space: pre; }
+  #screen canvas { display: block; }
+
+  /* ── status + controls ── */
+  .bar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin: 18px 0 0; font-size: 14px; color: var(--ink-soft);
+  }
+  .state { display: flex; align-items: center; gap: 8px; }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--muted);
+    transition: background .3s;
+  }
+  .dot.live { background: var(--ink); }
+  .spacer { flex: 1; }
+  button {
+    font-family: inherit; font-size: 13px; font-weight: 500;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 3px;
+    padding: 8px 16px; cursor: pointer; transition: all .15s;
+  }
+  button:hover { border-color: var(--ink); }
+  button.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  button.primary:hover { opacity: .85; }
+
+  /* ── command reference ── */
+  .commands { padding: 48px 0; border-top: 1px solid var(--line); margin-top: 48px; }
+  .commands h2 {
+    font-family: 'Anton', sans-serif; font-weight: 400; text-transform: uppercase;
+    font-size: 28px; letter-spacing: 0.02em; margin: 0 0 4px;
+  }
+  .commands p.sub { margin: 0 0 28px; color: var(--ink-soft); font-size: 15px; }
+  .cmd-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
+    background: var(--surface);
+  }
+  .cmd {
+    display: flex; gap: 12px; align-items: baseline;
+    padding: 14px 18px; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+  }
+  code {
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    background: var(--bg); border: 1px solid var(--line);
+    padding: 2px 7px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
+  }
+  .cmd span { font-size: 14px; color: var(--ink-soft); }
+  .note {
+    margin-top: 22px; font-size: 13.5px; color: var(--muted);
+    border-left: 2px solid var(--line); padding-left: 14px;
+  }
+
+  /* ── build / architecture strip ── */
+  .specs { padding: 0 0 48px; }
+  .specs h2 {
+    font-family: 'Anton', sans-serif; font-weight: 400; text-transform: uppercase;
+    font-size: 28px; letter-spacing: 0.02em; margin: 0 0 24px;
+  }
+  .spec-row {
+    display: grid; grid-template-columns: 180px 1fr; gap: 16px;
+    padding: 16px 0; border-top: 1px solid var(--line-soft); font-size: 15px;
+  }
+  .spec-row dt { color: var(--muted); font-weight: 500; }
+  .spec-row dd { margin: 0; color: var(--ink); }
+
+  /* ── footer ── */
+  footer {
+    border-top: 1px solid var(--line); padding: 32px 0 80px;
+    display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+    font-size: 14px; color: var(--muted);
+  }
+  footer a { color: var(--ink); text-decoration: none; text-underline-offset: 3px; }
+  footer a:hover { text-decoration: underline; }
+  footer .sep { color: var(--line); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="kicker">Operating System · C &amp; x86 Assembly</div>
+    <h1>JacobOS</h1>
+    <p class="lede">A 32-bit x86 operating system written from scratch — custom bootloader,
+    protected-mode kernel, preemptive scheduler, paging, and a persistent on-disk
+    filesystem. It boots and runs right here, in your browser, through the
+    <a href="https://github.com/copy/v86">v86</a> emulator.</p>
+  </header>
+
+  <section class="term-section">
+    <div class="term-label">
+      <span>Live system</span>
+      <span class="state"><span class="dot" id="dot"></span><span id="statusText">loading…</span></span>
+    </div>
+    <div class="term-frame">
+      <div id="screen"></div>
+    </div>
+    <div class="bar">
+      <span>Click the screen, then type. Input goes straight to the kernel's keyboard driver.</span>
+      <span class="spacer"></span>
+      <button class="primary" id="focus">Click to type</button>
+      <button id="restart">Restart</button>
+    </div>
+  </section>
+
+  <section class="commands">
+    <h2>Try it</h2>
+    <p class="sub">A small shell with real directory traversal and a persistent filesystem.</p>
+    <div class="cmd-grid">
+      <div class="cmd"><code>help</code><span>list every command</span></div>
+      <div class="cmd"><code>ls</code><span>list the current directory</span></div>
+      <div class="cmd"><code>cat readme.txt</code><span>print a file</span></div>
+      <div class="cmd"><code>cd docs</code><span>change directory</span></div>
+      <div class="cmd"><code>mkdir notes</code><span>make a directory</span></div>
+      <div class="cmd"><code>echo hi &gt; f.txt</code><span>write a file</span></div>
+      <div class="cmd"><code>ps</code><span>list concurrent tasks</span></div>
+      <div class="cmd"><code>spawn</code><span>start a background task</span></div>
+      <div class="cmd"><code>meminfo</code><span>heap &amp; cache stats</span></div>
+    </div>
+    <p class="note">Files you create persist for the session — the disk lives in the emulated
+    machine's memory. Reload for a clean slate.</p>
+  </section>
+
+  <section class="specs">
+    <h2>Under the hood</h2>
+    <dl>
+      <div class="spec-row"><dt>Boot</dt><dd>Custom MBR bootloader → protected mode → C kernel, loaded over LBA disk reads.</dd></div>
+      <div class="spec-row"><dt>Interrupts</dt><dd>IDT with full ISR/IRQ stubs, remapped 8259 PIC, PS/2 keyboard driver.</dd></div>
+      <div class="spec-row"><dt>Memory</dt><dd>Bitmap physical frame allocator, 4&nbsp;MB-page paging, first-fit kernel heap.</dd></div>
+      <div class="spec-row"><dt>Tasking</dt><dd>1:1 preemptive kernel threads, round-robin scheduler driven by the PIT.</dd></div>
+      <div class="spec-row"><dt>Storage</dt><dd>ATA PIO driver → hierarchical filesystem → write-back block cache.</dd></div>
+    </dl>
+  </section>
+
+  <footer>
+    <span>Built by Jacob Cho</span>
+    <span class="sep">/</span>
+    <a href="https://github.com/jacho15/JacobOS">Source on GitHub</a>
+    <span class="sep">/</span>
+    <a href="https://jacob-a-cho.com">jacob-a-cho.com</a>
+  </footer>
+
+</div>
+
+<!-- v86 emulator, pinned + subresource integrity so a CDN swap can't inject code -->
+<script src="https://cdn.jsdelivr.net/npm/v86@0.5.379/build/libv86.js"
+        integrity="sha384-KTvZOeDUCKojviBaOZoYy654DMIzdDebeGweYajHl/sQWu74oHLu5PY5dTjd6VOY"
+        crossorigin="anonymous"></script>
+<script>
+  const V86_BASE = "https://cdn.jsdelivr.net/npm/v86@0.5.379";
+  const dot = document.getElementById("dot");
+  const statusText = document.getElementById("statusText");
+  let emulator = null;
+
+  function boot() {
+    if (emulator) { emulator.destroy(); emulator = null; }
+    dot.classList.remove("live");
+    statusText.textContent = "booting…";
+
+    emulator = new V86({
+      wasm_path: V86_BASE + "/build/v86.wasm",
+      bios:     { url: "bios/seabios.bin" },
+      vga_bios: { url: "bios/vgabios.bin" },
+      screen_container: document.getElementById("screen"),
+      // hda = kernel/boot image; hdb = the persistent filesystem disk (primary
+      // IDE slave, which the kernel's ATA driver targets)
+      hda: { url: "jacobos.img" },
+      hdb: { url: "jacobos-disk.img" },
+      memory_size: 32 * 1024 * 1024,
+      vga_memory_size: 2 * 1024 * 1024,
+      autostart: true,
+    });
+
+    emulator.add_listener("emulator-ready", () => {
+      dot.classList.add("live");
+      statusText.textContent = "running";
+    });
+  }
+
+  document.getElementById("restart").onclick = boot;
+  document.getElementById("focus").onclick = () => {
+    (document.querySelector("#screen canvas") || document.querySelector("#screen div"))?.focus();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  boot();
+</script>
+</body>
+</html>

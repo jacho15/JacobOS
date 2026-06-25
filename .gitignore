@@ -1,0 +1,6 @@
+# build output
+build/
+
+# playwright / browser test captures
+.playwright-mcp/
+*.ppm
