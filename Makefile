@@ -1,6 +1,7 @@
 ASM      = nasm
 CC       = i686-linux-gnu-gcc
 LD       = i686-linux-gnu-ld
+OBJCOPY  = i686-linux-gnu-objcopy
 
 #running the code on the qemu emulator (so i dont brick my laptop)
 QEMU     = qemu-system-i386
@@ -29,6 +30,14 @@ KERNEL_BIN = build/kernel.bin
 OS_IMAGE   = build/os-image.bin
 DISK_IMG   = build/disk.img
 
+# ---- user program (ring-3 demo) -------------------------------------------
+# built freestanding, linked at the user window (8MB), then embedded into the
+# kernel as a binary blob so the kernel can write it to the filesystem at boot
+USER_CFLAGS = -ffreestanding -m32 -nostdlib -nostdinc -fno-builtin -fno-pic \
+              -fno-asynchronous-unwind-tables -fno-stack-protector -Os -Wall -I.
+USER_ELF    = build/user/hello.elf
+USER_BLOB   = build/user/hello_blob.o
+
 # ---- build rules ----------------------------------------------------------
 all: $(OS_IMAGE)
 
@@ -44,7 +53,17 @@ $(BOOT_BIN): $(BOOT_SRC) boot/gdt.asm
 	@mkdir -p $(dir $@)
 	$(ASM) -f bin $< -o $@
 
-$(KERNEL_BIN): $(KENTRY_OBJ) $(C_OBJS) $(ASM_OBJS)
+build/user/hello.o: user/hello.c
+	@mkdir -p build/user
+	$(CC) $(USER_CFLAGS) -c $< -o $@
+
+$(USER_ELF): build/user/hello.o user/user.ld
+	$(LD) -s -T user/user.ld -o $@ build/user/hello.o
+
+$(USER_BLOB): $(USER_ELF)
+	$(OBJCOPY) -I binary -O elf32-i386 -B i386 $< $@
+
+$(KERNEL_BIN): $(KENTRY_OBJ) $(C_OBJS) $(ASM_OBJS) $(USER_BLOB)
 	$(LD) -o $@ $(LDFLAGS) --oformat binary $^
 
 $(OS_IMAGE): $(BOOT_BIN) $(KERNEL_BIN)

@@ -31,25 +31,8 @@
   }
   .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
 
-  /* ── header ── */
-  header { padding: 72px 0 40px; border-bottom: 1px solid var(--line); }
-  .kicker {
-    font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
-    color: var(--muted); font-weight: 600; margin-bottom: 18px;
-  }
-  h1 {
-    font-family: 'Anton', sans-serif; font-weight: 400;
-    font-size: clamp(56px, 12vw, 124px); line-height: 0.92;
-    letter-spacing: 0.01em; text-transform: uppercase; margin: 0;
-  }
-  .lede {
-    margin: 22px 0 0; max-width: 60ch;
-    font-size: 17px; color: var(--ink-soft);
-  }
-  .lede a { color: var(--ink); text-underline-offset: 3px; }
-
   /* ── terminal ── */
-  .term-section { padding: 40px 0 8px; }
+  .term-section { padding: 48px 0 8px; }
   .term-label {
     display: flex; align-items: center; justify-content: space-between;
     font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
@@ -111,42 +94,10 @@
     margin-top: 22px; font-size: 13.5px; color: var(--muted);
     border-left: 2px solid var(--line); padding-left: 14px;
   }
-
-  /* ── build / architecture strip ── */
-  .specs { padding: 0 0 48px; }
-  .specs h2 {
-    font-family: 'Anton', sans-serif; font-weight: 400; text-transform: uppercase;
-    font-size: 28px; letter-spacing: 0.02em; margin: 0 0 24px;
-  }
-  .spec-row {
-    display: grid; grid-template-columns: 180px 1fr; gap: 16px;
-    padding: 16px 0; border-top: 1px solid var(--line-soft); font-size: 15px;
-  }
-  .spec-row dt { color: var(--muted); font-weight: 500; }
-  .spec-row dd { margin: 0; color: var(--ink); }
-
-  /* ── footer ── */
-  footer {
-    border-top: 1px solid var(--line); padding: 32px 0 80px;
-    display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
-    font-size: 14px; color: var(--muted);
-  }
-  footer a { color: var(--ink); text-decoration: none; text-underline-offset: 3px; }
-  footer a:hover { text-decoration: underline; }
-  footer .sep { color: var(--line); }
 </style>
 </head>
 <body>
 <div class="wrap">
-
-  <header>
-    <div class="kicker">Operating System · C &amp; x86 Assembly</div>
-    <h1>JacobOS</h1>
-    <p class="lede">A 32-bit x86 operating system written from scratch — custom bootloader,
-    protected-mode kernel, preemptive scheduler, paging, and a persistent on-disk
-    filesystem. It boots and runs right here, in your browser, through the
-    <a href="https://github.com/copy/v86">v86</a> emulator.</p>
-  </header>
 
   <section class="term-section">
     <div class="term-label">
@@ -160,7 +111,8 @@
       <span>Click the screen, then type. Input goes straight to the kernel's keyboard driver.</span>
       <span class="spacer"></span>
       <button class="primary" id="focus">Click to type</button>
-      <button id="restart">Restart</button>
+      <button id="save">Save session</button>
+      <button id="reset">Reset disk</button>
     </div>
   </section>
 
@@ -178,28 +130,11 @@
       <div class="cmd"><code>spawn</code><span>start a background task</span></div>
       <div class="cmd"><code>meminfo</code><span>heap &amp; cache stats</span></div>
     </div>
-    <p class="note">Files you create persist for the session — the disk lives in the emulated
-    machine's memory. Reload for a clean slate.</p>
+    <p class="note">Files persist across reloads: the machine state — including the filesystem
+    disk — is saved to your browser's IndexedDB when you leave or hit <em>Save session</em>,
+    and restored on your next visit. <em>Reset disk</em> wipes the saved state and boots fresh.</p>
   </section>
 
-  <section class="specs">
-    <h2>Under the hood</h2>
-    <dl>
-      <div class="spec-row"><dt>Boot</dt><dd>Custom MBR bootloader → protected mode → C kernel, loaded over LBA disk reads.</dd></div>
-      <div class="spec-row"><dt>Interrupts</dt><dd>IDT with full ISR/IRQ stubs, remapped 8259 PIC, PS/2 keyboard driver.</dd></div>
-      <div class="spec-row"><dt>Memory</dt><dd>Bitmap physical frame allocator, 4&nbsp;MB-page paging, first-fit kernel heap.</dd></div>
-      <div class="spec-row"><dt>Tasking</dt><dd>1:1 preemptive kernel threads, round-robin scheduler driven by the PIT.</dd></div>
-      <div class="spec-row"><dt>Storage</dt><dd>ATA PIO driver → hierarchical filesystem → write-back block cache.</dd></div>
-    </dl>
-  </section>
-
-  <footer>
-    <span>Built by Jacob Cho</span>
-    <span class="sep">/</span>
-    <a href="https://github.com/jacho15/JacobOS">Source on GitHub</a>
-    <span class="sep">/</span>
-    <a href="https://jacob-a-cho.com">jacob-a-cho.com</a>
-  </footer>
 
 </div>
 
@@ -212,6 +147,44 @@
   const dot = document.getElementById("dot");
   const statusText = document.getElementById("statusText");
   let emulator = null;
+
+  // --- persistence: the full machine state (which includes the filesystem
+  // disk) is stored in IndexedDB and restored on the next visit ---------------
+  const DB_NAME = "jacobos", STORE = "state", KEY = "machine";
+  function openDB() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open(DB_NAME, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  function txDone(tx) {
+    return new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
+  }
+  async function saveState(buf) {
+    const db = await openDB();
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).put(buf, KEY);
+    await txDone(tx); db.close();
+  }
+  async function loadState() {
+    const db = await openDB();
+    const tx = db.transaction(STORE, "readonly");
+    const g = tx.objectStore(STORE).get(KEY);
+    const buf = await new Promise((res, rej) => {
+      g.onsuccess = () => res(g.result || null);
+      g.onerror = () => rej(g.error);
+    });
+    db.close();
+    return buf;
+  }
+  async function clearState() {
+    const db = await openDB();
+    const tx = db.transaction(STORE, "readwrite");
+    tx.objectStore(STORE).delete(KEY);
+    await txDone(tx); db.close();
+  }
 
   function boot() {
     if (emulator) { emulator.destroy(); emulator = null; }
@@ -232,13 +205,47 @@
       autostart: true,
     });
 
-    emulator.add_listener("emulator-ready", () => {
+    emulator.add_listener("emulator-ready", async () => {
       dot.classList.add("live");
+      // resume a saved session if one exists (restores disk + full state)
+      try {
+        const saved = await loadState();
+        if (saved) {
+          await emulator.restore_state(saved);
+          statusText.textContent = "running (restored)";
+          return;
+        }
+      } catch (e) {
+        console.warn("restore failed, booting fresh:", e);
+        try { await clearState(); } catch (_) {}
+      }
       statusText.textContent = "running";
     });
   }
 
-  document.getElementById("restart").onclick = boot;
+  // best-effort save when the tab is hidden/closed (fires before unload)
+  document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState === "hidden" && emulator) {
+      try { await saveState(await emulator.save_state()); } catch (e) {}
+    }
+  });
+
+  document.getElementById("save").onclick = async function () {
+    if (!emulator) return;
+    const label = this.textContent;
+    this.textContent = "saving…";
+    try { await saveState(await emulator.save_state()); this.textContent = "saved ✓"; }
+    catch (e) { this.textContent = "save failed"; }
+    setTimeout(() => { this.textContent = label; }, 1500);
+    this.blur();
+  };
+
+  document.getElementById("reset").onclick = async function () {
+    try { await clearState(); } catch (e) {}
+    boot();
+    this.blur();
+  };
+
   document.getElementById("focus").onclick = () => {
     (document.querySelector("#screen canvas") || document.querySelector("#screen div"))?.focus();
     window.scrollTo({ top: 0, behavior: "smooth" });
