@@ -5,9 +5,10 @@ COMPLETED:
 4. process creation/switching, scheduler works
 5. file reads/writes, persistence
 6. multiple processes, shell commands, stress tests
+7. power-user shell extras: cp, mv, rm -r, output append (>>)
+8. M:N green threads on top of the 1:1 kernel threads (gt command)
+9. ELF user programs in ring 3 (syscalls via int 0x80; exec command)
+10. IndexedDB-backed disk persistence in the v86 web demo
 
 FOLLOW-UP IDEAS:
-- power-user shell extras: cp, mv, rm -r, output append (>>)
-- M:N green threads on top of the 1:1 kernel threads
-- ELF user programs in ring 3 (syscalls via int 0x80)
-- IndexedDB-backed disk persistence in the v86 web demo
+- (nothing queued)

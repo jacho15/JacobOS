@@ -74,6 +74,10 @@ void isr_install(void) {
     set_idt_gate(44, (u32)irq12); set_idt_gate(45, (u32)irq13);
     set_idt_gate(46, (u32)irq14); set_idt_gate(47, (u32)irq15);
 
+    //syscall gate: dpl 3 so ring-3 code may `int 0x80`
+    extern void isr128();
+    set_idt_gate_dpl(0x80, (u32)isr128, 3);
+
     load_idt();
 }
 

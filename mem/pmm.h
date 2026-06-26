@@ -7,9 +7,10 @@
 //assumed RAM size: this custom bootloader gives us no BIOS memory map, so we
 //assume the 32MB the Makefile boots qemu with (-m 32M)
 #define PHYS_MEM_SIZE    0x2000000u   //32 MB
-//first 8MB are reserved: low memory, the kernel image, the boot stack, and the
-//kernel heap all live here, so the frame allocator only hands out frames above
-#define PMM_RESERVED_END 0x800000u
+//first 12MB are reserved: low memory, the kernel image, the boot stack, the
+//kernel heap (4-8MB), and the ring-3 user window (8-12MB) all live here, so the
+//frame allocator only ever hands out frames above them
+#define PMM_RESERVED_END 0xC00000u
 
 void pmm_init(void);
 u32  pmm_alloc_frame(void);   //returns a physical address, or 0 when full

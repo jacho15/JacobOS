@@ -3,6 +3,7 @@
 ;C dispatchers in isr.c
 extern isr_handler
 extern irq_handler
+extern syscall_handler
 
 ;CPU exceptions 0..31. some push an error code, most do not; the NOERR macro
 ;pushes a dummy 0 so the stack layout is uniform for registers_t.
@@ -117,6 +118,39 @@ irq_common_stub:
     mov gs, ax
     push esp
     call irq_handler
+    add esp, 4
+    pop eax
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    popa
+    add esp, 8
+    sti
+    iret
+
+;syscall vector 0x80: same uniform stack layout as the ISR/IRQ stubs (so the
+;C handler gets a registers_t*), but dispatches to syscall_handler. the CPU
+;pushed ss:esp too when entering from ring 3, and the cross-privilege iret pops
+;them back, so the same `add esp,8; iret` tail returns correctly to ring 3.
+global isr128
+isr128:
+    cli
+    push dword 0
+    push dword 128
+    jmp syscall_common_stub
+
+syscall_common_stub:
+    pusha
+    mov ax, ds
+    push eax
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    push esp
+    call syscall_handler
     add esp, 4
     pop eax
     mov ds, ax

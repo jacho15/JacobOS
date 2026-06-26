@@ -3,6 +3,7 @@
 #include "drivers/timer.h"
 #include "drivers/ata.h"
 #include "cpu/isr.h"
+#include "cpu/gdt.h"
 #include "mem/pmm.h"
 #include "mem/paging.h"
 #include "mem/kheap.h"
@@ -21,6 +22,7 @@ void main() {
     kprint("============================\n");
     set_color(VGA_COLOR(VGA_LIGHT_GREY, VGA_BLACK));
 
+    gdt_install();
     isr_install();
 
     pmm_init();
@@ -44,6 +46,17 @@ void main() {
         kprint("[ok] filesystem mounted (boot #");
         kprint(b);
         kprint(")\n");
+    }
+
+    {
+        //install the embedded ring-3 demo program as /hello so `exec hello` works
+        extern u8 _binary_build_user_hello_elf_start[];
+        extern u8 _binary_build_user_hello_elf_end[];
+        u32 len = (u32)(_binary_build_user_hello_elf_end - _binary_build_user_hello_elf_start);
+        int f = sfs_lookup(SFS_ROOT, "hello");
+        if (f < 0) f = sfs_create(SFS_ROOT, "hello", SFS_FILE);
+        if (f >= 0) sfs_write(f, (const char*)_binary_build_user_hello_elf_start, len);
+        bcache_sync();
     }
 
     init_keyboard();

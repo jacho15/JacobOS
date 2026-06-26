@@ -18,20 +18,23 @@ an x86 emulator compiled to WebAssembly — no install, just type `help`.
 | **Interrupts** | 256-entry IDT, ISR stubs for all CPU exceptions, 8259 PIC remap, IRQ dispatch. |
 | **Input**    | PS/2 keyboard driver (IRQ1) with shift/caps and a line buffer. |
 | **Memory**   | Bitmap physical frame allocator, 4 MB-page paging, first-fit kernel heap (`kmalloc`/`kfree`), page-fault reporting. |
-| **Tasking**  | 1:1 preemptive kernel threads, round-robin scheduler driven by the PIT timer (IRQ0). |
+| **Tasking**  | 1:1 preemptive kernel threads, round-robin scheduler driven by the PIT timer (IRQ0), plus cooperative M:1 green threads (fibers) layered on top. |
+| **User mode** | ELF loader runs static programs in **ring 3** (user GDT segments + a TSS for the ring transition); they call the kernel via `int 0x80` syscalls (`write`, `exit`, `yield`). |
 | **Storage**  | Synchronous ATA PIO driver → hierarchical filesystem (inodes, directories, `.`/`..`) → write-back RAM block cache. Persists across reboots. |
-| **Shell**    | `help`, `ls`, `cd`, `pwd`, `mkdir`, `touch`, `cat`, `echo > file`, `rm`, `ps`, `spawn`, `stress`, `meminfo`, `uptime`. |
+| **Shell**    | `help`, `ls`, `cd`, `pwd`, `mkdir`, `touch`, `cat`, `cp`, `mv`, `echo > file` (and `>>` to append), `rm` (and `rm -r`), `exec`, `gt`, `ps`, `spawn`, `stress`, `meminfo`, `uptime`. |
 
 ## Layout
 
 ```
 boot/     bootloader + GDT (NASM)
-cpu/      IDT, ISRs, PIC, port I/O, low-level types
+cpu/      IDT, ISRs, PIC, runtime GDT + TSS, int 0x80 syscalls, port I/O, types
 drivers/  screen, serial, keyboard, timer, ATA
 mem/      physical frame allocator, paging, kernel heap
 fs/       filesystem + block cache
-kernel/   entry, main, tasks/scheduler, context switch, shell
+kernel/   entry, main, tasks/scheduler, context switch, green threads,
+          ELF loader + ring-3 exec, shell
 lib/      freestanding string/mem/itoa helpers
+user/     a tiny freestanding ring-3 demo program (embedded as /hello)
 docs/     the browser demo (GitHub Pages)
 ```
 
@@ -69,5 +72,8 @@ make web   # rebuilds and copies the image into docs/jacobos.img
 Enable Pages under **Settings → Pages → Deploy from branch → `/docs`**, or let
 the included `.github/workflows/pages.yml` build and deploy on every push.
 
-> Note: in-browser disk writes persist only for the page session (the disk lives
-> in the emulator's memory). Local QEMU runs persist fully via `build/disk.img`.
+> Note: the demo persists across reloads by saving the full machine state
+> (including the filesystem disk) to the browser's **IndexedDB** — automatically
+> when you leave the tab, or via the **Save session** button — and restoring it on
+> your next visit. **Reset disk** clears it for a clean boot. Local QEMU runs
+> persist fully via `build/disk.img`.
