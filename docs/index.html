@@ -6,135 +6,315 @@
 <title>JacobOS — a hobby x86 operating system, live in your browser</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  /* palette lifted from jacob-a-cho.com "Real World" theme — cool monochrome */
+  /* chiaroscuro: warm near-black canvas, parchment ink, antique gold */
   :root {
-    --bg:        rgb(248 248 250);
-    --surface:   rgb(255 255 255);
-    --line:      rgb(225 225 230);
-    --line-soft: rgb(238 238 242);
-    --ink:       rgb(10 10 12);
-    --ink-soft:  rgb(85 85 92);
-    --muted:     rgb(140 140 148);
-    --term-bg:   rgb(12 12 14);
+    --canvas:    #131110;
+    --surface:   #1a1714;
+    --line:      #332d24;
+    --line-soft: #241f1a;
+    --parchment: #eae3d1;
+    --soft:      #a89d85;
+    --muted:     #6f6654;
+    --gold:      #c2a468;
+    --gold-dim:  #86713f;
+    --term-bg:   #0a0908;
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
     margin: 0;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--canvas);
+    color: var(--parchment);
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 17px;
     -webkit-font-smoothing: antialiased;
-    line-height: 1.6;
+    line-height: 1.65;
   }
-  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+  /* painterly grain + vignette, no imagery */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    opacity: 0.045;
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    background: radial-gradient(ellipse 120% 90% at 50% 18%, transparent 55%, rgba(0,0,0,0.5) 100%);
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 3; }
+  a { color: var(--gold); text-decoration: none; border-bottom: 1px solid var(--gold-dim); }
+  a:hover { border-bottom-color: var(--gold); }
+  :focus-visible { outline: 1px solid var(--gold); outline-offset: 3px; }
 
-  /* ── terminal ── */
-  .term-section { padding: 48px 0 8px; }
-  .term-label {
-    display: flex; align-items: center; justify-content: space-between;
-    font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--muted); font-weight: 600; margin-bottom: 12px;
+  .eyebrow {
+    font-family: 'Cormorant Garamond', serif; font-weight: 600;
+    font-size: 14px; letter-spacing: 0.34em; text-transform: uppercase;
+    color: var(--gold);
   }
-  .term-frame {
-    background: var(--term-bg); border: 1px solid var(--ink);
-    border-radius: 4px; padding: 14px; overflow: hidden;
+
+  /* ── header ── */
+  header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 26px 0 0;
   }
-  #screen { white-space: pre; font: 14px/1.0 'JetBrains Mono', 'Courier New', monospace; color: #dcdcdc; }
+  .wordmark {
+    font-family: 'Cormorant Garamond', serif; font-weight: 600;
+    font-size: 15px; letter-spacing: 0.34em; text-transform: uppercase;
+    color: var(--parchment);
+  }
+  header a { font-size: 14px; color: var(--soft); border-bottom-color: var(--line); }
+  header a:hover { color: var(--gold); }
+
+  /* ── hero ── */
+  .hero { padding: 84px 0 56px; }
+  .hero h1 {
+    font-family: 'Cormorant Garamond', serif; font-weight: 500;
+    font-size: clamp(56px, 9vw, 88px); line-height: 1.02;
+    letter-spacing: 0.01em; margin: 14px 0 22px;
+  }
+  .hero p {
+    max-width: 620px; margin: 0; font-size: 19px; color: var(--soft);
+  }
+  .hero p em { color: var(--parchment); font-style: italic; }
+
+  /* staggered fade on load */
+  .rise { opacity: 0; transform: translateY(10px); animation: rise .9s cubic-bezier(.2,.6,.2,1) forwards; }
+  .rise.d1 { animation-delay: .1s; } .rise.d2 { animation-delay: .25s; } .rise.d3 { animation-delay: .4s; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .rise { animation: none; opacity: 1; transform: none; }
+    html { scroll-behavior: auto; }
+  }
+
+  /* ── the terminal, framed like a painting ── */
+  .term-section { padding: 8px 0 8px; }
+  .frame {
+    border: 1px solid var(--gold-dim);
+    padding: 7px;               /* the matte gap */
+    background: var(--surface);
+  }
+  .frame-inner {
+    border: 1px solid var(--line);
+    background: var(--term-bg);
+    padding: 14px; overflow-x: auto; overflow-y: hidden;
+  }
+  #screen { white-space: pre; font: 14px/1.0 'JetBrains Mono', 'Courier New', monospace; color: #d5cdbc; }
   #screen div { white-space: pre; }
   #screen canvas { display: block; }
 
-  /* ── status + controls ── */
-  .bar {
+  /* museum plaque under the frame */
+  .plaque {
     display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    margin: 18px 0 0; font-size: 14px; color: var(--ink-soft);
+    margin: 16px 0 0; font-size: 15px; color: var(--soft);
   }
-  .state { display: flex; align-items: center; gap: 8px; }
+  .plaque-label {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted);
+  }
+  .state { display: flex; align-items: center; gap: 8px; font-size: 14px; }
   .dot {
-    width: 8px; height: 8px; border-radius: 50%; background: var(--muted);
-    transition: background .3s;
+    width: 7px; height: 7px; border-radius: 50%; background: var(--muted);
+    transition: background .3s, box-shadow .3s;
   }
-  .dot.live { background: var(--ink); }
+  .dot.live { background: var(--gold); box-shadow: 0 0 8px rgba(194,164,104,.7); }
   .spacer { flex: 1; }
   button {
-    font-family: inherit; font-size: 13px; font-weight: 500;
-    background: var(--surface); color: var(--ink);
-    border: 1px solid var(--line); border-radius: 3px;
-    padding: 8px 16px; cursor: pointer; transition: all .15s;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.08em;
+    background: transparent; color: var(--parchment);
+    border: 1px solid var(--line); padding: 8px 16px;
+    cursor: pointer; transition: border-color .15s, opacity .15s;
   }
-  button:hover { border-color: var(--ink); }
-  button.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-  button.primary:hover { opacity: .85; }
+  button:hover { border-color: var(--gold-dim); }
+  button.primary { background: var(--gold); color: #171410; border-color: var(--gold); font-weight: 500; }
+  button.primary:hover { opacity: .88; }
+  .hint { margin: 14px 0 0; font-size: 15px; color: var(--soft); }
 
-  /* ── command reference ── */
-  .commands { padding: 48px 0; border-top: 1px solid var(--line); margin-top: 48px; }
-  .commands h2 {
-    font-family: 'Anton', sans-serif; font-weight: 400; text-transform: uppercase;
-    font-size: 28px; letter-spacing: 0.02em; margin: 0 0 4px;
+  /* ── sections ── */
+  section.block { padding: 64px 0 8px; }
+  .rule {
+    display: flex; align-items: center; gap: 18px; margin: 64px 0 0;
   }
-  .commands p.sub { margin: 0 0 28px; color: var(--ink-soft); font-size: 15px; }
-  .cmd-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
-    background: var(--surface);
+  .rule::before, .rule::after { content: ""; flex: 1; height: 1px; background: var(--line-soft); }
+  .rule span { color: var(--gold-dim); font-size: 13px; letter-spacing: .3em; }
+  h2 {
+    font-family: 'Cormorant Garamond', serif; font-weight: 500;
+    font-size: 40px; letter-spacing: 0.01em; margin: 0 0 6px;
   }
-  .cmd {
-    display: flex; gap: 12px; align-items: baseline;
-    padding: 14px 18px; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+  p.sub { margin: 0 0 32px; color: var(--soft); font-size: 17px; max-width: 560px; }
+
+  /* command tour, grouped by subsystem */
+  .tour { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 36px 32px; }
+  .tour h3 {
+    font-family: 'Cormorant Garamond', serif; font-weight: 600; font-size: 13px;
+    letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold);
+    margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--line-soft);
   }
+  .tour dl { margin: 0; }
+  .tour dt { margin: 14px 0 2px; }
+  .tour dt:first-child { margin-top: 0; }
   code {
-    font-family: 'JetBrains Mono', monospace; font-size: 13px;
-    background: var(--bg); border: 1px solid var(--line);
-    padding: 2px 7px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
+    font-family: 'JetBrains Mono', monospace; font-size: 13.5px; color: var(--parchment);
+    background: var(--surface); border: 1px solid var(--line-soft);
+    padding: 2px 8px; white-space: nowrap;
   }
-  .cmd span { font-size: 14px; color: var(--ink-soft); }
+  .tour dd { margin: 4px 0 0; font-size: 15px; color: var(--soft); }
+
+  /* the road to ring 3 — boot chronology */
+  .road { border-top: 1px solid var(--line-soft); }
+  .stage {
+    display: grid; grid-template-columns: 84px 200px 1fr; gap: 8px 28px;
+    padding: 22px 0; border-bottom: 1px solid var(--line-soft); align-items: baseline;
+  }
+  .stage .n {
+    font-family: 'Cormorant Garamond', serif; font-weight: 500; font-size: 30px;
+    color: var(--gold-dim); font-variant-numeric: tabular-nums;
+  }
+  .stage .name { font-family: 'Newsreader', serif; font-weight: 500; font-size: 18px; }
+  .stage .what { font-size: 15.5px; color: var(--soft); }
+  @media (max-width: 640px) {
+    .stage { grid-template-columns: 56px 1fr; }
+    .stage .what { grid-column: 2; }
+  }
+
   .note {
-    margin-top: 22px; font-size: 13.5px; color: var(--muted);
-    border-left: 2px solid var(--line); padding-left: 14px;
+    margin-top: 26px; font-size: 14.5px; color: var(--muted);
+    border-left: 1px solid var(--gold-dim); padding-left: 16px; max-width: 620px;
   }
+
+  /* ── footer ── */
+  footer { padding: 72px 0 44px; text-align: center; }
+  footer .motto {
+    font-family: 'Cormorant Garamond', serif; font-style: italic;
+    font-size: 19px; color: var(--gold-dim); margin: 0 0 18px;
+  }
+  footer .who { font-size: 14px; color: var(--muted); }
+  footer .who a { color: var(--soft); border-bottom-color: var(--line); }
+  footer .who a:hover { color: var(--gold); }
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <section class="term-section">
-    <div class="term-label">
-      <span>Live system</span>
+  <header>
+    <span class="wordmark">JacobOS</span>
+    <a href="https://github.com/jacho15/JacobOS">Source on GitHub</a>
+  </header>
+
+  <section class="hero">
+    <div class="eyebrow rise">An x86 operating system, written from scratch</div>
+    <h1 class="rise d1">JacobOS</h1>
+    <p class="rise d2">A 32-bit kernel in C and assembly — custom bootloader, preemptive
+    scheduler, paging, a persistent filesystem, and user programs in ring 3.
+    <em>The machine below is real:</em> the same image that boots in QEMU, running in an
+    x86 emulator compiled to WebAssembly.</p>
+  </section>
+
+  <section class="term-section rise d3">
+    <div class="frame">
+      <div class="frame-inner">
+        <div id="screen"></div>
+      </div>
+    </div>
+    <div class="plaque">
+      <span class="plaque-label">Live system · x86 via WebAssembly</span>
       <span class="state"><span class="dot" id="dot"></span><span id="statusText">loading…</span></span>
-    </div>
-    <div class="term-frame">
-      <div id="screen"></div>
-    </div>
-    <div class="bar">
-      <span>Click the screen, then type. Input goes straight to the kernel's keyboard driver.</span>
       <span class="spacer"></span>
       <button class="primary" id="focus">Click to type</button>
       <button id="save">Save session</button>
       <button id="reset">Reset disk</button>
     </div>
+    <p class="hint">Click the screen, then type — keys go straight to the kernel's PS/2 driver.
+    Start with <code>help</code>.</p>
   </section>
 
-  <section class="commands">
+  <div class="rule"><span>※</span></div>
+
+  <section class="block">
     <h2>Try it</h2>
-    <p class="sub">A small shell with real directory traversal and a persistent filesystem.</p>
-    <div class="cmd-grid">
-      <div class="cmd"><code>help</code><span>list every command</span></div>
-      <div class="cmd"><code>ls</code><span>list the current directory</span></div>
-      <div class="cmd"><code>cat readme.txt</code><span>print a file</span></div>
-      <div class="cmd"><code>cd docs</code><span>change directory</span></div>
-      <div class="cmd"><code>mkdir notes</code><span>make a directory</span></div>
-      <div class="cmd"><code>echo hi &gt; f.txt</code><span>write a file</span></div>
-      <div class="cmd"><code>ps</code><span>list concurrent tasks</span></div>
-      <div class="cmd"><code>spawn</code><span>start a background task</span></div>
-      <div class="cmd"><code>meminfo</code><span>heap &amp; cache stats</span></div>
+    <p class="sub">A few commands, one per subsystem, that show what's running underneath.</p>
+    <div class="tour">
+      <div>
+        <h3>Filesystem</h3>
+        <dl>
+          <dt><code>ls</code></dt><dd>list the current directory</dd>
+          <dt><code>cat readme.txt</code></dt><dd>read a file off the disk</dd>
+          <dt><code>mkdir notes</code></dt><dd>make a directory, then <code>cd</code> into it</dd>
+          <dt><code>echo hi &gt; f.txt</code></dt><dd>write a file — it survives a reload</dd>
+        </dl>
+      </div>
+      <div>
+        <h3>Tasking</h3>
+        <dl>
+          <dt><code>ps</code></dt><dd>list the tasks the scheduler is juggling</dd>
+          <dt><code>spawn</code></dt><dd>start a background kernel thread</dd>
+          <dt><code>gt</code></dt><dd>run cooperative green threads on top</dd>
+        </dl>
+      </div>
+      <div>
+        <h3>Memory &amp; ring 3</h3>
+        <dl>
+          <dt><code>exec /hello</code></dt><dd>load an ELF binary and drop to user mode</dd>
+          <dt><code>meminfo</code></dt><dd>heap and block-cache statistics</dd>
+          <dt><code>stress</code></dt><dd>hammer the allocator and scheduler</dd>
+        </dl>
+      </div>
     </div>
-    <p class="note">Files persist across reloads: the machine state — including the filesystem
-    disk — is saved to your browser's IndexedDB when you leave or hit <em>Save session</em>,
-    and restored on your next visit. <em>Reset disk</em> wipes the saved state and boots fresh.</p>
+    <p class="note">Files persist across visits: the whole machine state, disk included, is
+    saved to your browser's IndexedDB when you leave (or press <em>Save session</em>) and
+    restored next time. <em>Reset disk</em> wipes it for a clean boot.</p>
   </section>
 
+  <section class="block">
+    <h2>The road to ring 3</h2>
+    <p class="sub">What happens between power-on and the shell prompt — every stage
+    hand-written, no libraries, no firmware help beyond the BIOS.</p>
+    <div class="road">
+      <div class="stage">
+        <span class="n">I</span>
+        <span class="name">Boot sector</span>
+        <span class="what">512 bytes of assembly load the kernel over INT 13h, build a GDT,
+        enter protected mode, and jump to C.</span>
+      </div>
+      <div class="stage">
+        <span class="n">II</span>
+        <span class="name">Interrupts</span>
+        <span class="what">A 256-entry IDT with stubs for every CPU exception; the 8259 PIC
+        remapped so hardware IRQs stop colliding with faults.</span>
+      </div>
+      <div class="stage">
+        <span class="n">III</span>
+        <span class="name">Memory</span>
+        <span class="what">A bitmap physical frame allocator, paging switched on, and a
+        first-fit kernel heap behind <code>kmalloc</code> / <code>kfree</code>.</span>
+      </div>
+      <div class="stage">
+        <span class="n">IV</span>
+        <span class="name">Tasking</span>
+        <span class="what">Preemptive round-robin kernel threads driven by the PIT timer,
+        with cooperative green threads layered on top.</span>
+      </div>
+      <div class="stage">
+        <span class="n">V</span>
+        <span class="name">Storage</span>
+        <span class="what">An ATA driver feeding a hierarchical inode filesystem through a
+        write-back block cache — files persist across reboots.</span>
+      </div>
+      <div class="stage">
+        <span class="n">VI</span>
+        <span class="name">Ring 3</span>
+        <span class="what">An ELF loader, a TSS for the privilege transition, and
+        <code>int 0x80</code> syscalls — user programs run unprivileged and ask the kernel
+        for everything.</span>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p class="motto">« Tomorrow boots. »</p>
+    <p class="who">Built by <a href="https://jacob-a-cho.com">Jacob Cho</a> ·
+    <a href="https://github.com/jacho15/JacobOS">read the source</a></p>
+  </footer>
 
 </div>
 
