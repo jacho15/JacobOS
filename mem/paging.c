@@ -7,6 +7,7 @@ static u32 page_directory[1024] __attribute__((aligned(4096)));
 
 #define PDE_PRESENT 0x1
 #define PDE_RW      0x2
+#define PDE_USER    0x4
 #define PDE_4MB     0x80
 
 void paging_init(void) {
@@ -31,4 +32,10 @@ void paging_init(void) {
     __asm__ volatile ("mov %%cr0, %0" : "=r"(cr0));
     cr0 |= 0x80000000;
     __asm__ volatile ("mov %0, %%cr0" : : "r"(cr0));
+}
+
+void paging_set_user(u32 vaddr) {
+    page_directory[vaddr >> 22] |= PDE_USER;
+    //flush the TLB so the new permission takes effect (reload cr3)
+    __asm__ volatile ("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "eax");
 }

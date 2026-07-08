@@ -1,5 +1,7 @@
 #include "kernel/shell.h"
 #include "kernel/task.h"
+#include "kernel/green.h"
+#include "kernel/exec.h"
 #include "drivers/screen.h"
 #include "drivers/keyboard.h"
 #include "drivers/timer.h"
@@ -73,10 +75,14 @@ static void cmd_help(void) {
     kprint("  mkdir <name>    create a directory\n");
     kprint("  touch <name>    create an empty file\n");
     kprint("  cat <file>      print a file\n");
-    kprint("  echo <txt> > f  write text to file f\n");
-    kprint("  rm <name>       remove a file or empty dir\n");
+    kprint("  cp <src> <dst>  copy a file\n");
+    kprint("  mv <src> <dst>  rename/move a file\n");
+    kprint("  echo <txt> > f  write text to file f (>> appends)\n");
+    kprint("  rm [-r] <name>  remove a file or (with -r) a dir tree\n");
     kprint("  ps              list running tasks\n");
     kprint("  spawn           start a background task\n");
+    kprint("  exec <prog>     run an ELF program in user mode (try 'exec hello')\n");
+    kprint("  gt              run a cooperative green-thread demo\n");
     kprint("  stress          hammer the heap\n");
     kprint("  meminfo         memory + cache stats\n");
     kprint("  uptime          seconds since boot\n");
@@ -120,6 +126,60 @@ static void cmd_cat(const char *name) {
     kfree(buf);
 }
 
+//largest file SFS can hold: 14 direct blocks * 512 bytes
+#define SFS_MAX_FILE (14 * 512)
+
+static void cmd_cp(const char *src, const char *dst) {
+    if (!src || !src[0] || !dst || !dst[0]) { kprint("cp: usage: cp <src> <dst>\n"); return; }
+    int s = resolve(src);
+    if (s < 0) { kprint("cp: no such file\n"); return; }
+    if (sfs_type(s) != SFS_FILE) { kprint("cp: not a file\n"); return; }
+    u32 sz = sfs_size(s);
+    char *buf = (char*)kmalloc(sz ? sz : 1);
+    if (!buf) { kprint("cp: out of memory\n"); return; }
+    int n = sfs_read(s, buf, sz);
+    int d = sfs_lookup(cwd, dst);
+    if (d < 0) d = sfs_create(cwd, dst, SFS_FILE);
+    if (d < 0) { kprint("cp: cannot create dest\n"); kfree(buf); return; }
+    if (sfs_type(d) != SFS_FILE) { kprint("cp: dest is not a file\n"); kfree(buf); return; }
+    sfs_write(d, buf, (u32)n);
+    kfree(buf);
+}
+
+//move within the current directory (files only): copy then unlink the source
+static void cmd_mv(const char *src, const char *dst) {
+    if (!src || !src[0] || !dst || !dst[0]) { kprint("mv: usage: mv <src> <dst>\n"); return; }
+    int s = sfs_lookup(cwd, src);
+    if (s < 0) { kprint("mv: no such file in current directory\n"); return; }
+    if (sfs_type(s) != SFS_FILE) { kprint("mv: only files are supported\n"); return; }
+    cmd_cp(src, dst);
+    if (sfs_lookup(cwd, dst) >= 0) sfs_unlink(cwd, src);
+}
+
+//recursively delete name within parent (empties directories first)
+static int rm_rec(int parent, const char *name) {
+    int ino = sfs_lookup(parent, name);
+    if (ino < 0) return -1;
+    if (sfs_type(ino) == SFS_DIR) {
+        //repeatedly remove the first real child, restarting the scan each time
+        //because removals shift dirent indices
+        char nm[32];
+        for (;;) {
+            int found = 0;
+            for (int i = 0; ; i++) {
+                int c = sfs_readdir(ino, i, nm);
+                if (c < 0) break;
+                if (strcmp(nm, ".") == 0 || strcmp(nm, "..") == 0) continue;
+                rm_rec(ino, nm);
+                found = 1;
+                break;
+            }
+            if (!found) break;
+        }
+    }
+    return sfs_unlink(parent, name);
+}
+
 static void cmd_ps(void);   //forward
 
 static void cmd_meminfo(void) {
@@ -129,6 +189,25 @@ static void cmd_meminfo(void) {
     kprint_dec(kheap_free()); kprint("B free\n");
     kprint("cache:  "); kprint_dec(bcache_hits()); kprint(" hits / ");
     kprint_dec(bcache_misses()); kprint(" miss\n");
+}
+
+//--- green-thread demo -----------------------------------------------------
+static volatile int gt_counter;
+static void gt_body(void) {
+    for (int i = 0; i < 5; i++) {
+        gt_counter++;
+        kprint(".");
+        gt_yield();
+    }
+}
+static void cmd_gt(void) {
+    gt_counter = 0;
+    gt_init();
+    int n = 0;
+    for (int i = 0; i < 4; i++) if (gt_spawn(gt_body) == 0) n++;
+    kprint("running "); kprint_dec(n); kprint(" green threads: ");
+    gt_run();
+    kprint("\ngt done, counter = "); kprint_dec(gt_counter); kprint("\n");
 }
 
 static void cmd_stress(void) {
@@ -176,9 +255,12 @@ static void run_command(char *line) {
     }
     else if (strcmp(cmd, "cat") == 0) cmd_cat(argc > 1 ? argv[1] : 0);
     else if (strcmp(cmd, "echo") == 0) {
-        //echo words...  OR  echo words... > file
-        int redir = -1;
-        for (int i = 1; i < argc; i++) if (strcmp(argv[i], ">") == 0) { redir = i; break; }
+        //echo words...  OR  echo words... > file  OR  echo words... >> file
+        int redir = -1, append = 0;
+        for (int i = 1; i < argc; i++) {
+            if (strcmp(argv[i], ">") == 0)  { redir = i; append = 0; break; }
+            if (strcmp(argv[i], ">>") == 0) { redir = i; append = 1; break; }
+        }
         char text[256]; text[0] = 0;
         int end = (redir < 0) ? argc : redir;
         for (int i = 1; i < end; i++) {
@@ -192,11 +274,30 @@ static void run_command(char *line) {
             int ino = sfs_lookup(cwd, fname);
             if (ino < 0) ino = sfs_create(cwd, fname, SFS_FILE);
             if (ino < 0) kprint("echo: cannot create file\n");
-            else sfs_write(ino, text, strlen(text));
+            else if (!append) sfs_write(ino, text, strlen(text));
+            else {
+                //SFS is overwrite-only, so append = read existing + concat + rewrite
+                u32 old = sfs_size(ino), add = strlen(text);
+                char *buf = (char*)kmalloc(old + add + 1);
+                if (!buf) { kprint("echo: out of memory\n"); }
+                else {
+                    int n = sfs_read(ino, buf, old);
+                    memcpy(buf + n, text, add);
+                    if ((u32)n + add > SFS_MAX_FILE) kprint("echo: file capped at 7KB\n");
+                    sfs_write(ino, buf, (u32)n + add);
+                    kfree(buf);
+                }
+            }
         }
     }
+    else if (strcmp(cmd, "cp") == 0) cmd_cp(argc > 1 ? argv[1] : 0, argc > 2 ? argv[2] : 0);
+    else if (strcmp(cmd, "mv") == 0) cmd_mv(argc > 1 ? argv[1] : 0, argc > 2 ? argv[2] : 0);
     else if (strcmp(cmd, "rm") == 0) {
         if (argc < 2) kprint("rm: need a name\n");
+        else if (strcmp(argv[1], "-r") == 0) {
+            if (argc < 3) kprint("rm: -r needs a name\n");
+            else if (rm_rec(cwd, argv[2]) < 0) kprint("rm: failed\n");
+        }
         else if (sfs_unlink(cwd, argv[1]) < 0) kprint("rm: failed (missing or non-empty dir)\n");
     }
     else if (strcmp(cmd, "ps") == 0) cmd_ps();
@@ -205,6 +306,18 @@ static void run_command(char *line) {
         if (t) { kprint("spawned task #"); kprint_dec((int)t->id); kprint("\n"); }
         else kprint("spawn: failed\n");
     }
+    else if (strcmp(cmd, "exec") == 0) {
+        if (argc < 2) kprint("exec: need a program\n");
+        else {
+            int ino = resolve(argv[1]);
+            if (ino < 0 || sfs_type(ino) != SFS_FILE) kprint("exec: no such program\n");
+            else {
+                int rc = exec_user(ino);
+                kprint("[exit "); kprint_dec(rc); kprint("]\n");
+            }
+        }
+    }
+    else if (strcmp(cmd, "gt") == 0) cmd_gt();
     else if (strcmp(cmd, "stress") == 0) cmd_stress();
     else if (strcmp(cmd, "meminfo") == 0) cmd_meminfo();
     else if (strcmp(cmd, "uptime") == 0) {

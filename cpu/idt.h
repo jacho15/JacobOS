@@ -21,6 +21,9 @@ typedef struct {
 } __attribute__((packed)) idt_register_t;
 
 void set_idt_gate(int n, u32 handler);
+//like set_idt_gate but with an explicit descriptor privilege level, so ring-3
+//code can reach the gate (needed for the int 0x80 syscall vector with dpl 3)
+void set_idt_gate_dpl(int n, u32 handler, u8 dpl);
 void load_idt(void);
 
 #endif

@@ -2,6 +2,7 @@
 #include "cpu/isr.h"
 #include "cpu/ports.h"
 #include "kernel/task.h"
+#include "kernel/exec.h"
 
 #define PIT_FREQ    1193182u
 #define PIT_CMD     0x43
@@ -12,8 +13,9 @@ static volatile u32 ticks;
 static void timer_callback(registers_t *r) {
     (void)r;
     ticks++;
-    //preemptive round-robin: hand the CPU to the next task every tick
-    schedule();
+    //preemptive round-robin: hand the CPU to the next task every tick. while a
+    //ring-3 program runs we suspend switching (it shares one transition stack)
+    if (!exec_user_running()) schedule();
 }
 
 u32 timer_ticks(void) { return ticks; }
