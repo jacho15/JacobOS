@@ -4,3 +4,8 @@ build/
 # playwright / browser test captures
 .playwright-mcp/
 *.ppm
+
+# impeccable skill working files
+.impeccable/
+DESIGN.md
+PRODUCT.md

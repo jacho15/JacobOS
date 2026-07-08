@@ -3,164 +3,258 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JacobOS — a hobby x86 operating system, live in your browser</title>
+<meta name="theme-color" content="#0b0d21">
+<meta name="description" content="A 32-bit x86 operating system written from scratch in C and assembly — booting live in your browser through the v86 emulator.">
+<title>JacobOS — a hand-built x86 operating system, live in your browser</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2304050d'/%3E%3Ccircle cx='8' cy='8' r='3' fill='%23ebbd57'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,500&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  /* palette lifted from jacob-a-cho.com "Real World" theme — cool monochrome */
+  /* "The Painted Monolith" — see DESIGN.md. Twilight sea ground, one gold light source. */
   :root {
-    --bg:        rgb(248 248 250);
-    --surface:   rgb(255 255 255);
-    --line:      rgb(225 225 230);
-    --line-soft: rgb(238 238 242);
-    --ink:       rgb(10 10 12);
-    --ink-soft:  rgb(85 85 92);
-    --muted:     rgb(140 140 148);
-    --term-bg:   rgb(12 12 14);
+    color-scheme: dark;
+    --twilight-sea:    #0b0d21;
+    --monolith-stone:  #12162d;
+    --ridge-line:      #2c314a;
+    --abyss:           #04050d;
+    --candlelit-ivory: #f0e7d6;
+    --faded-ivory:     #b8bdd2;
+    --mist:            #868ba2;
+    --painted-light:   #ebbd57;
+    --old-gold:        #cd9130;
+    --gommage-rose:    #d45666;
+
+    --font-display: 'Bodoni Moda', 'Didot', Georgia, serif;
+    --font-body:    'EB Garamond', Garamond, Georgia, serif;
+    --font-mono:    'JetBrains Mono', 'Courier New', monospace;
+
+    --ease-standard: cubic-bezier(0.25, 1, 0.5, 1);
+    --space-section: clamp(64px, 10vh, 128px);
   }
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
     margin: 0;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--twilight-sea);
+    color: var(--faded-ivory);
+    font-family: var(--font-body);
+    font-size: 1.125rem;
+    line-height: 1.65;
+    /* light-on-dark: a touch of tracking keeps Garamond from thinning out */
+    letter-spacing: 0.01em;
     -webkit-font-smoothing: antialiased;
-    line-height: 1.6;
   }
+  ::selection { background: var(--painted-light); color: var(--abyss); }
   .wrap { max-width: 880px; margin: 0 auto; padding: 0 24px; }
 
-  /* ── header ── */
-  header { padding: 72px 0 40px; border-bottom: 1px solid var(--line); }
-  .kicker {
-    font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase;
-    color: var(--muted); font-weight: 600; margin-bottom: 18px;
-  }
-  h1 {
-    font-family: 'Anton', sans-serif; font-weight: 400;
-    font-size: clamp(56px, 12vw, 124px); line-height: 0.92;
-    letter-spacing: 0.01em; text-transform: uppercase; margin: 0;
-  }
-  .lede {
-    margin: 22px 0 0; max-width: 60ch;
-    font-size: 17px; color: var(--ink-soft);
-  }
-  .lede a { color: var(--ink); text-underline-offset: 3px; }
+  a { color: var(--candlelit-ivory); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+  a:hover { color: var(--painted-light); }
+  a:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--painted-light); border-radius: 1px; }
 
-  /* ── terminal ── */
-  .term-section { padding: 40px 0 8px; }
+  /* ── hero ── */
+  header { padding: clamp(48px, 8vh, 88px) 0 0; }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: clamp(3.5rem, 9vw, 6rem);
+    line-height: 1.02;
+    letter-spacing: 0;
+    margin: 0;
+    color: var(--candlelit-ivory);
+    text-wrap: balance;
+  }
+  .plaque {
+    margin: 24px 0 0;
+    color: var(--candlelit-ivory);
+    font-weight: 500;
+  }
+
+  /* ── the monolith ── */
+  .term-section { padding: 40px 0 0; }
   .term-label {
-    display: flex; align-items: center; justify-content: space-between;
-    font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--muted); font-weight: 600; margin-bottom: 12px;
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+    font-family: var(--font-mono); font-size: 0.8125rem; font-weight: 500; line-height: 1.4;
+    color: var(--mist);
+    margin-bottom: 12px;
   }
+  .state { display: inline-flex; align-items: center; gap: 8px; color: var(--faded-ivory); }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--mist);
+    transition: background 300ms var(--ease-standard), box-shadow 300ms var(--ease-standard);
+  }
+  .dot.live { background: var(--painted-light); box-shadow: 0 0 8px rgba(235, 189, 87, 0.5); }
   .term-frame {
-    background: var(--term-bg); border: 1px solid var(--ink);
-    border-radius: 4px; padding: 14px; overflow: hidden;
+    background: var(--abyss);
+    border: 1px solid var(--old-gold);
+    border-radius: 4px;
+    padding: 14px;
+    overflow-x: auto; overflow-y: hidden;
+    box-shadow: 0 0 48px rgba(235, 189, 87, 0);
+    transition: box-shadow 600ms cubic-bezier(0.22, 1, 0.36, 1),
+                border-color 150ms var(--ease-standard);
   }
-  #screen { white-space: pre; font: 14px/1.0 'JetBrains Mono', 'Courier New', monospace; color: #dcdcdc; }
+  .term-frame.live { box-shadow: 0 0 48px rgba(235, 189, 87, 0.14); }
+  /* keyboard attached — input is really going to the kernel */
+  .term-frame.kbd { border-color: var(--painted-light); }
+  /* the screen itself is real — never styled, filtered, or overlaid */
+  /* 25 text rows at 14px — reserve the screen's real height so boot doesn't shift the page */
+  #screen { white-space: pre; font: 14px/1.0 'JetBrains Mono', 'Courier New', monospace; color: #dcdcdc; min-height: 350px; }
   #screen div { white-space: pre; }
   #screen canvas { display: block; }
 
   /* ── status + controls ── */
   .bar {
     display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-    margin: 18px 0 0; font-size: 14px; color: var(--ink-soft);
+    margin: 18px 0 0;
   }
-  .state { display: flex; align-items: center; gap: 8px; }
-  .dot {
-    width: 8px; height: 8px; border-radius: 50%; background: var(--muted);
-    transition: background .3s;
-  }
-  .dot.live { background: var(--ink); }
+  .bar .hint { color: var(--faded-ivory); font-size: 1.0625rem; }
   .spacer { flex: 1; }
+  .actions { display: inline-flex; gap: 10px; }
   button {
-    font-family: inherit; font-size: 13px; font-weight: 500;
-    background: var(--surface); color: var(--ink);
-    border: 1px solid var(--line); border-radius: 3px;
-    padding: 8px 16px; cursor: pointer; transition: all .15s;
+    font-family: var(--font-mono); font-size: 0.8125rem; font-weight: 500;
+    border-radius: 2px; padding: 10px 22px; cursor: pointer;
+    transition: background 150ms var(--ease-standard),
+                border-color 150ms var(--ease-standard),
+                color 150ms var(--ease-standard);
   }
-  button:hover { border-color: var(--ink); }
-  button.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-  button.primary:hover { opacity: .85; }
+  button:active { transform: translateY(1px); }
+  @media (pointer: coarse) {
+    button { padding: 13px 24px; }
+  }
+  .btn-primary { background: var(--painted-light); color: var(--abyss); border: none; }
+  .btn-primary:hover { background: var(--old-gold); }
+  .btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--painted-light), 0 0 0 4px var(--twilight-sea); }
+  .btn-ghost { background: transparent; color: var(--candlelit-ivory); border: 1px solid var(--ridge-line); }
+  .btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--painted-light); }
+  /* the Petal Rule: restart is an act of erasure */
+  #restart:hover { border-color: var(--gommage-rose); color: var(--gommage-rose); }
+
+  /* ── section headings ── */
+  h2 {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: clamp(1.75rem, 3.5vw, 2.25rem);
+    line-height: 1.15;
+    letter-spacing: 0;
+    color: var(--candlelit-ivory);
+    margin: 0 0 8px;
+    text-wrap: balance;
+  }
+  .sub { margin: 0 0 32px; color: var(--faded-ivory); max-width: 64ch; }
 
   /* ── command reference ── */
-  .commands { padding: 48px 0; border-top: 1px solid var(--line); margin-top: 48px; }
-  .commands h2 {
-    font-family: 'Anton', sans-serif; font-weight: 400; text-transform: uppercase;
-    font-size: 28px; letter-spacing: 0.02em; margin: 0 0 4px;
-  }
-  .commands p.sub { margin: 0 0 28px; color: var(--ink-soft); font-size: 15px; }
+  .commands { padding: var(--space-section) 0 0; }
   .cmd-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden;
-    background: var(--surface);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 14px 40px;
   }
-  .cmd {
-    display: flex; gap: 12px; align-items: baseline;
-    padding: 14px 18px; border-right: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+  .cmd { display: flex; gap: 12px; align-items: baseline; }
+  .cmd code {
+    font-family: var(--font-mono); font-size: 0.8125rem; font-weight: 500; line-height: 1.4;
+    background: var(--monolith-stone); color: var(--painted-light);
+    border: 1px solid var(--ridge-line);
+    padding: 2px 8px; border-radius: 2px; white-space: nowrap; flex-shrink: 0;
   }
-  code {
-    font-family: 'JetBrains Mono', monospace; font-size: 13px;
-    background: var(--bg); border: 1px solid var(--line);
-    padding: 2px 7px; border-radius: 3px; white-space: nowrap; flex-shrink: 0;
-  }
-  .cmd span { font-size: 14px; color: var(--ink-soft); }
-  .note {
-    margin-top: 22px; font-size: 13.5px; color: var(--muted);
-    border-left: 2px solid var(--line); padding-left: 14px;
-  }
+  .cmd span { font-size: 1.0625rem; color: var(--faded-ivory); }
+  .note { margin: 32px 0 0; font-size: 1rem; color: var(--mist); max-width: 64ch; }
 
-  /* ── build / architecture strip ── */
-  .specs { padding: 0 0 48px; }
-  .specs h2 {
-    font-family: 'Anton', sans-serif; font-weight: 400; text-transform: uppercase;
-    font-size: 28px; letter-spacing: 0.02em; margin: 0 0 24px;
+  /* ── under the hood ── */
+  .specs { padding: var(--space-section) 0 0; }
+  .specs-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 16px clamp(40px, 7vw, 80px);
+    align-items: start;
+    margin-top: 24px;
   }
+  /* the one painted numeral — the Paintress paints the year; this page paints its word size */
+  .numeral {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: clamp(4.5rem, 11vw, 7rem);
+    line-height: 0.9;
+    color: var(--painted-light);
+    user-select: none;
+  }
+  .numeral small {
+    display: block;
+    font-family: var(--font-body); font-size: 1rem; font-style: italic; line-height: 1.4;
+    color: var(--mist);
+    margin-top: 10px; max-width: 16ch;
+    text-wrap: balance;
+  }
+  dl { margin: 0; }
   .spec-row {
-    display: grid; grid-template-columns: 180px 1fr; gap: 16px;
-    padding: 16px 0; border-top: 1px solid var(--line-soft); font-size: 15px;
+    display: grid; grid-template-columns: 150px 1fr; gap: 16px;
+    padding: 14px 0;
+    border-top: 1px solid var(--ridge-line);
   }
-  .spec-row dt { color: var(--muted); font-weight: 500; }
-  .spec-row dd { margin: 0; color: var(--ink); }
+  .spec-row:last-child { border-bottom: 1px solid var(--ridge-line); }
+  .spec-row dt { color: var(--mist); font-weight: 500; }
+  .spec-row dd { margin: 0; color: var(--faded-ivory); }
 
   /* ── footer ── */
   footer {
-    border-top: 1px solid var(--line); padding: 32px 0 80px;
+    margin-top: var(--space-section);
+    border-top: 1px solid var(--ridge-line);
+    padding: 32px 0 80px;
     display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
-    font-size: 14px; color: var(--muted);
+    font-size: 1.0625rem; color: var(--mist);
   }
-  footer a { color: var(--ink); text-decoration: none; text-underline-offset: 3px; }
-  footer a:hover { text-decoration: underline; }
-  footer .sep { color: var(--line); }
+  footer a { color: var(--faded-ivory); text-decoration: none; }
+  footer a:hover { color: var(--candlelit-ivory); text-decoration: underline; text-underline-offset: 3px; }
+  footer .sep { color: var(--ridge-line); }
+
+  /* ── entrance: one quiet rise, then stillness ── */
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: none; }
+  }
+  header       { animation: rise 700ms var(--ease-standard) both; }
+  .term-section { animation: rise 700ms 120ms var(--ease-standard) both; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    header, .term-section { animation: none; }
+    .term-frame, .dot, button, a { transition: none; }
+    /* the aura becomes a static border-color change */
+    .term-frame.live { box-shadow: none; border-color: var(--painted-light); }
+  }
+
+  @media (max-width: 560px) {
+    .specs-grid { grid-template-columns: 1fr; }
+    .numeral small { max-width: none; }
+    .spec-row { grid-template-columns: 1fr; gap: 2px; }
+    .bar .hint { flex-basis: 100%; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
 
   <header>
-    <div class="kicker">Operating System · C &amp; x86 Assembly</div>
     <h1>JacobOS</h1>
-    <p class="lede">A 32-bit x86 operating system written from scratch — custom bootloader,
-    protected-mode kernel, preemptive scheduler, paging, and a persistent on-disk
-    filesystem. It boots and runs right here, in your browser, through the
-    <a href="https://github.com/copy/v86">v86</a> emulator.</p>
+    <p class="plaque">C and x86 assembly.</p>
   </header>
 
   <section class="term-section">
     <div class="term-label">
       <span>Live system</span>
-      <span class="state"><span class="dot" id="dot"></span><span id="statusText">loading…</span></span>
+      <span class="state" aria-live="polite"><span class="dot" id="dot"></span><span id="statusText">loading…</span></span>
     </div>
-    <div class="term-frame">
+    <div class="term-frame" id="frame">
       <div id="screen"></div>
     </div>
     <div class="bar">
-      <span>Click the screen, then type. Input goes straight to the kernel's keyboard driver.</span>
+      <span class="hint">Click the screen, then type. Input goes straight to the kernel's keyboard driver.</span>
       <span class="spacer"></span>
-      <button class="primary" id="focus">Click to type</button>
-      <button id="restart">Restart</button>
+      <span class="actions">
+        <button class="btn-primary" id="focus">Click to type</button>
+        <button class="btn-ghost" id="restart">Restart</button>
+      </span>
     </div>
   </section>
 
@@ -184,13 +278,16 @@
 
   <section class="specs">
     <h2>Under the hood</h2>
-    <dl>
-      <div class="spec-row"><dt>Boot</dt><dd>Custom MBR bootloader → protected mode → C kernel, loaded over LBA disk reads.</dd></div>
-      <div class="spec-row"><dt>Interrupts</dt><dd>IDT with full ISR/IRQ stubs, remapped 8259 PIC, PS/2 keyboard driver.</dd></div>
-      <div class="spec-row"><dt>Memory</dt><dd>Bitmap physical frame allocator, 4&nbsp;MB-page paging, first-fit kernel heap.</dd></div>
-      <div class="spec-row"><dt>Tasking</dt><dd>1:1 preemptive kernel threads, round-robin scheduler driven by the PIT.</dd></div>
-      <div class="spec-row"><dt>Storage</dt><dd>ATA PIO driver → hierarchical filesystem → write-back block cache.</dd></div>
-    </dl>
+    <div class="specs-grid">
+      <div class="numeral" aria-hidden="true">32<small>bits, from power-on to shell</small></div>
+      <dl>
+        <div class="spec-row"><dt>Boot</dt><dd>Custom MBR bootloader → protected mode → C kernel, loaded over LBA disk reads.</dd></div>
+        <div class="spec-row"><dt>Interrupts</dt><dd>IDT with full ISR/IRQ stubs, remapped 8259 PIC, PS/2 keyboard driver.</dd></div>
+        <div class="spec-row"><dt>Memory</dt><dd>Bitmap physical frame allocator, 4&nbsp;MB-page paging, first-fit kernel heap.</dd></div>
+        <div class="spec-row"><dt>Tasking</dt><dd>1:1 preemptive kernel threads, round-robin scheduler driven by the PIT.</dd></div>
+        <div class="spec-row"><dt>Storage</dt><dd>ATA PIO driver → hierarchical filesystem → write-back block cache.</dd></div>
+      </dl>
+    </div>
   </section>
 
   <footer>
@@ -210,12 +307,18 @@
 <script>
   const V86_BASE = "https://cdn.jsdelivr.net/npm/v86@0.5.379";
   const dot = document.getElementById("dot");
+  const frame = document.getElementById("frame");
   const statusText = document.getElementById("statusText");
   let emulator = null;
 
   function boot() {
+    if (typeof V86 === "undefined") {
+      statusText.textContent = "emulator failed to load — refresh to retry";
+      return;
+    }
     if (emulator) { emulator.destroy(); emulator = null; }
     dot.classList.remove("live");
+    frame.classList.remove("live");
     statusText.textContent = "booting…";
 
     emulator = new V86({
@@ -232,15 +335,30 @@
       autostart: true,
     });
 
+    // don't swallow the page's keyboard: the kernel only gets keys
+    // after the visitor clicks the terminal (or "Click to type")
+    emulator.keyboard_set_enabled(false);
+    frame.classList.remove("kbd");
+
     emulator.add_listener("emulator-ready", () => {
       dot.classList.add("live");
+      frame.classList.add("live");
       statusText.textContent = "running";
     });
   }
 
+  function setKeyboard(on) {
+    if (emulator) emulator.keyboard_set_enabled(on);
+    frame.classList.toggle("kbd", on);
+  }
+
+  document.addEventListener("mousedown", (e) => {
+    setKeyboard(frame.contains(e.target) || !!e.target.closest("#focus"));
+  });
+
   document.getElementById("restart").onclick = boot;
   document.getElementById("focus").onclick = () => {
-    (document.querySelector("#screen canvas") || document.querySelector("#screen div"))?.focus();
+    setKeyboard(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
