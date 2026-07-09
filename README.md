@@ -21,7 +21,7 @@ an x86 emulator compiled to WebAssembly — no install, just type `help`.
 | **Tasking**  | 1:1 preemptive kernel threads, round-robin scheduler driven by the PIT timer (IRQ0), plus cooperative M:1 green threads (fibers) layered on top. |
 | **User mode** | ELF loader runs static programs in **ring 3** (user GDT segments + a TSS for the ring transition); they call the kernel via `int 0x80` syscalls (`write`, `exit`, `yield`). |
 | **Storage**  | Synchronous ATA PIO driver → hierarchical filesystem (inodes, directories, `.`/`..`) → write-back RAM block cache. Persists across reboots. |
-| **Shell**    | `help`, `ls`, `cd`, `pwd`, `mkdir`, `touch`, `cat`, `cp`, `mv`, `echo > file` (and `>>` to append), `rm` (and `rm -r`), `exec`, `gt`, `ps`, `spawn`, `stress`, `meminfo`, `uptime`. |
+| **Shell**    | `help`, `clear`, `ls`, `cd`, `pwd`, `mkdir`, `touch`, `cat`, `cp`, `mv`, `echo > file` (and `>>` to append), `rm` (and `rm -r`), `exec`, `gt`, `ps`, `spawn`, `stress`, `meminfo`, `uptime`. |
 
 ## Layout
 
