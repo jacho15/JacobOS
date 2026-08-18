@@ -1,8 +1,13 @@
 #include "kernel/task.h"
+#include "cpu/gdt.h"
 #include "mem/kheap.h"
 #include "lib/string.h"
 
-#define STACK_SIZE 16384
+#define STACK_SIZE  16384
+//ring-0 stack a ring3 -> ring0 trap switches to. sized like the shell's own
+//stack use because the keyboard IRQ runs the whole shell on it when it fires
+//while a user program is in ring 3.
+#define KSTACK_SIZE 8192
 
 extern void context_switch(u32 *save_old_esp, u32 new_esp);
 
@@ -10,6 +15,12 @@ static task_t *current;       //task running right now
 static task_t *head;          //ring entry point (the initial kernel task)
 static u32     next_id;
 static int     scheduling_on;
+
+//top of a ring-0 stack, 16-byte aligned. a failed allocation stays 0 so callers
+//can tell there is no stack to trap onto.
+static u32 kstack_top_of(u32 base) {
+    return base ? ((base + KSTACK_SIZE) & ~15u) : 0;
+}
 
 //every task starts here so we can enable interrupts on its fresh stack (a brand
 //new task is entered via a plain `ret`, not `iret`, so IF would otherwise stay
@@ -28,9 +39,13 @@ void tasking_init(void) {
     current->state = TASK_RUNNING;
     current->entry = 0;
     current->stack_base = 0;
+    current->kstack_base = (u32)kmalloc(KSTACK_SIZE);
+    current->kstack_top  = kstack_top_of(current->kstack_base);
     current->next = current;   //ring of one
     head = current;
     scheduling_on = 1;
+    //nothing has been switched to yet, so prime the TSS for this first task
+    tss_set_kernel_stack(current->kstack_top);
 }
 
 task_t *task_create(const char *name, void (*entry)(void)) {
@@ -38,6 +53,9 @@ task_t *task_create(const char *name, void (*entry)(void)) {
     if (!t) return 0;
     t->stack_base = (u32)kmalloc(STACK_SIZE);
     if (!t->stack_base) { kfree(t); return 0; }
+    t->kstack_base = (u32)kmalloc(KSTACK_SIZE);
+    if (!t->kstack_base) { kfree((void*)t->stack_base); kfree(t); return 0; }
+    t->kstack_top = kstack_top_of(t->kstack_base);
 
     t->id = next_id++;
     strncpy(t->name, name, TASK_NAME_MAX - 1);
@@ -76,6 +94,9 @@ void schedule(void) {
     if (prev->state == TASK_RUNNING) prev->state = TASK_READY;
     next->state = TASK_RUNNING;
     current = next;
+    //retarget the TSS before the switch: once `next` resumes it may be a task
+    //sitting in ring 3, and its trap frame has to land on its own stack
+    tss_set_kernel_stack(next->kstack_top);
     context_switch(&prev->esp, next->esp);
 }
 

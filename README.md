@@ -51,6 +51,27 @@ make run-headless # boot with serial mirrored to the terminal (no window)
 make debug        # boot with interrupt/reset logging
 ```
 
+### Without a local toolchain (Docker)
+
+On Windows -- or anywhere you would rather not install a cross compiler -- build
+in a throwaway container from the repo root:
+
+```powershell
+docker run --rm -v "${PWD}:/src" -w /src ubuntu:24.04 bash -c "apt-get update -qq && apt-get install -y -qq nasm gcc-i686-linux-gnu binutils-i686-linux-gnu make && make"
+```
+
+(On bash, `-v "$PWD:/src"`.) That produces `build/os-image.bin`. QEMU is not in
+the container, so boot the result through the browser demo instead:
+
+```powershell
+Copy-Item build\os-image.bin docs\jacobos.img
+cd docs; python -m http.server 8000
+```
+
+Open <http://localhost:8000> and click **Reset disk** before testing -- otherwise
+a saved IndexedDB session restores the previous kernel and you test the wrong
+build.
+
 The kernel boots from `build/os-image.bin` (IDE master) and stores its
 filesystem on `build/disk.img` (IDE slave), which is created automatically and
 persists between runs. `make clean-disk` wipes it.

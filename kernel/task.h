@@ -10,6 +10,8 @@ enum task_state { TASK_RUNNING, TASK_READY, TASK_DEAD };
 typedef struct task {
     u32  esp;          //saved stack pointer (the whole context lives on the stack)
     u32  stack_base;   //allocated kernel stack, for reference/cleanup
+    u32  kstack_base;  //separate ring-0 stack that ring3 -> ring0 traps land on
+    u32  kstack_top;   //value loaded into TSS.esp0 while this task is current
     u32  id;
     char name[TASK_NAME_MAX];
     int  state;

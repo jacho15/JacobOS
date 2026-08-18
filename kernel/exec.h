@@ -10,8 +10,4 @@ int  exec_user(int inode);
 //called by the SYS_EXIT syscall: unwinds back into exec_user with the code
 void exec_on_exit(int code);
 
-//true while a ring-3 program is live; the timer uses this to suspend
-//preemption (the user shares one kernel transition stack)
-int  exec_user_running(void);
-
 #endif

@@ -1,5 +1,6 @@
 #include "kernel/exec.h"
 #include "kernel/elf.h"
+#include "kernel/task.h"
 #include "cpu/gdt.h"
 #include "mem/paging.h"
 #include "mem/kheap.h"
@@ -9,10 +10,6 @@
 #define USER_STACK_TOP 0xC00000u     //top of the user window; stack grows down
 #define MAX_USER_FILE  (14 * 512)    //SFS direct-block file ceiling
 
-//ring0 stack the CPU switches to (via TSS) on a ring3->ring0 trap. dedicated so
-//a syscall/IRQ from user mode never reuses an in-progress kernel stack.
-static u8 user_kstack[8192] __attribute__((aligned(16)));
-
 //defined in usermode.asm
 extern void enter_user(u32 entry, u32 user_esp, u32 *save_kesp);
 extern void leave_user(u32 saved_kesp);
@@ -21,8 +18,6 @@ static u32 g_kreturn_esp;       //kernel context to resume on exit
 static int g_exit_code;
 static volatile int g_user_running;
 
-int exec_user_running(void) { return g_user_running; }
-
 void exec_on_exit(int code) {
     g_exit_code = code;
     g_user_running = 0;
@@ -30,6 +25,14 @@ void exec_on_exit(int code) {
 }
 
 int exec_user(int inode) {
+    //one program at a time. a ring-3 program is now preemptible, so a second
+    //exec (typed while the first is merely descheduled) would load over the
+    //single user window at USER_BASE and clobber a program that is still live.
+    if (g_user_running) return -1;
+
+    task_t *t = task_current();
+    if (!t->kstack_top) return -1;   //no ring-0 stack for its traps to land on
+
     if (sfs_type(inode) != SFS_FILE) return -1;
     u32 sz = sfs_size(inode);
     if (sz == 0 || sz > MAX_USER_FILE) return -1;
@@ -44,7 +47,11 @@ int exec_user(int inode) {
     if (rc != 0) return -1;
 
     paging_set_user(USER_BASE);
-    tss_set_kernel_stack((u32)user_kstack + sizeof(user_kstack));
+    //traps taken from ring 3 land on this task's own ring-0 stack, which is
+    //separate from the stack exec_user is running on, so the frame the program
+    //returns through is never overwritten. schedule() keeps TSS.esp0 pointed at
+    //whichever task is current, so the program stays preemptible.
+    tss_set_kernel_stack(t->kstack_top);
 
     g_exit_code = -1;
     g_user_running = 1;
